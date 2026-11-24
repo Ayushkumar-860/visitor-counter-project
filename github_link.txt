@@ -1,21 +1,4 @@
-https://github.com/YOUR_USERNAME/visitor-counter-project
+https://github.com/Ayushkumar-860/visitor-counter-project
 
-PLACEHOLDER — Replace with your actual GitHub repository URL after creating it.
-
-Steps to create the repository:
-1. Go to https://github.com/new
-2. Repository name: visitor-counter-project
-3. Set to Public
-4. Do NOT initialize with README (you already have one)
-5. Click "Create repository"
-6. Follow the "push an existing repository" instructions shown by GitHub:
-
-   git init
-   git add .
-   git commit -m "Initial commit: Visitor Counter Flask+Redis+Docker+Kubernetes project"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/visitor-counter-project.git
-   git push -u origin main
-
-7. Replace YOUR_USERNAME above with your actual GitHub username.
-8. Update this file with the final URL and commit it.
+GitHub Repository: Ayushkumar-860/visitor-counter-project
+Pushed on: 2026-11-24
