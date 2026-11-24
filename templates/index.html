@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ app_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <meta name="description" content="Visitor Counter powered by Flask and Redis — Cloud Computing Academic Project" />
+</head>
+<body>
+  <!-- ── Header ─────────────────────────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="header-content">
+      <div class="logo-area">
+        <span class="logo-icon" aria-hidden="true">☁️</span>
+        <span class="logo-text">CloudCount</span>
+      </div>
+      <div class="env-badge env-{{ app_env }}">{{ app_env | upper }}</div>
+    </div>
+  </header>
+
+  <!-- ── Main ───────────────────────────────────────────────────────────────── -->
+  <main class="container">
+
+    <!-- Project Title -->
+    <section class="hero" aria-labelledby="project-title">
+      <h1 id="project-title">{{ app_title }}</h1>
+      <p class="subtitle">Deploy a Visitor Counter Web App (Flask + Redis) on Docker and Kubernetes</p>
+    </section>
+
+    <!-- Error Banner -->
+    {% if error_message %}
+    <div class="alert alert-error" role="alert" aria-live="assertive">
+      <span class="alert-icon">⚠️</span>
+      <div>
+        <strong>Service Error</strong>
+        <p>{{ error_message }}</p>
+        <small>The visitor count could not be recorded. Redis may be unavailable.</small>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Visitor Counter Card -->
+    <section class="counter-card" aria-labelledby="counter-heading">
+      <h2 id="counter-heading" class="card-label">Total Visitors</h2>
+      {% if visitor_count is not none %}
+        <div class="counter-value" aria-label="Visitor count: {{ visitor_count }}">
+          {{ visitor_count }}
+        </div>
+        <p class="counter-subtext">
+          You are visitor number <strong>{{ visitor_count }}</strong>.
+          Counter is stored atomically in Redis.
+        </p>
+      {% else %}
+        <div class="counter-value counter-unavailable" aria-label="Visitor count unavailable">
+          —
+        </div>
+        <p class="counter-subtext">Counter unavailable — Redis connection failed.</p>
+      {% endif %}
+      <button class="refresh-btn" onclick="window.location.reload()" aria-label="Refresh visitor count">
+        🔄 Refresh
+      </button>
+    </section>
+
+    <!-- Service Status Row -->
+    <section class="status-row" aria-label="Service status">
+      <div class="status-card {% if redis_ok %}status-ok{% else %}status-error{% endif %}">
+        <span class="status-icon" aria-hidden="true">{% if redis_ok %}✅{% else %}❌{% endif %}</span>
+        <div class="status-info">
+          <strong>Redis</strong>
+          <span>{{ redis_host }}:{{ redis_port }}</span>
+          <small class="status-label">{% if redis_ok %}Connected{% else %}Unreachable{% endif %}</small>
+        </div>
+      </div>
+      <div class="status-card status-ok">
+        <span class="status-icon" aria-hidden="true">✅</span>
+        <div class="status-info">
+          <strong>Flask</strong>
+          <span>Gunicorn WSGI</span>
+          <small class="status-label">Running</small>
+        </div>
+      </div>
+      <div class="status-card status-info-card">
+        <span class="status-icon" aria-hidden="true">🌐</span>
+        <div class="status-info">
+          <strong>Environment</strong>
+          <span>{{ app_env }}</span>
+          <small class="status-label">Active</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture / Technology Section -->
+    <section class="arch-section" aria-labelledby="arch-heading">
+      <h2 id="arch-heading">Architecture &amp; Technology Stack</h2>
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-icon">🐍</div>
+          <h3>Flask (Python 3.10)</h3>
+          <p>Lightweight WSGI web framework. Handles HTTP requests, renders Jinja2 templates, and exposes REST endpoints.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">⚡</div>
+          <h3>Redis 7</h3>
+          <p>In-memory data store used as a persistent, atomic visitor counter. <code>INCR</code> is race-condition-free across multiple workers.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">🐳</div>
+          <h3>Docker + Compose</h3>
+          <p>Containerises the app and Redis. Multi-stage build minimises image size. Named volume persists counter across restarts.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">☸️</div>
+          <h3>Kubernetes (Minikube)</h3>
+          <p>Orchestrates Flask replicas, provides self-healing, and scales pods with the Horizontal Pod Autoscaler under load.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">📈</div>
+          <h3>HPA &amp; Metrics Server</h3>
+          <p>Monitors CPU usage. Scales Flask pods from 2 → 5 replicas when CPU exceeds 50%. Scales back down during idle.</p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">🔀</div>
+          <h3>Failover Gateway</h3>
+          <p>Local reverse proxy simulates hybrid-cloud failover between two Minikube clusters (private-cluster + public-cluster).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Links / Endpoints -->
+    <section class="endpoints-section" aria-labelledby="endpoints-heading">
+      <h2 id="endpoints-heading">Application Endpoints</h2>
+      <table class="endpoints-table">
+        <thead>
+          <tr>
+            <th scope="col">Endpoint</th>
+            <th scope="col">Purpose</th>
+            <th scope="col">Used By</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/</code></td>
+            <td>Homepage — increments &amp; displays visitor count</td>
+            <td>Browser / Users</td>
+          </tr>
+          <tr>
+            <td><code>/health</code></td>
+            <td>Liveness probe — returns 200 if Flask is alive</td>
+            <td>Kubernetes Liveness</td>
+          </tr>
+          <tr>
+            <td><code>/ready</code></td>
+            <td>Readiness probe — returns 200 only when Redis is reachable</td>
+            <td>Kubernetes Readiness</td>
+          </tr>
+          <tr>
+            <td><code>/stats</code></td>
+            <td>JSON visitor count &amp; Redis connection info</td>
+            <td>Monitoring / API</td>
+          </tr>
+          <tr>
+            <td><code>/reset</code> (POST)</td>
+            <td>Reset counter (non-production only)</td>
+            <td>Testing</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <p>Cloud Computing Academic Project &mdash; Flask + Redis + Docker + Kubernetes</p>
+    <p>
+      <a href="/health" aria-label="Health check endpoint">/health</a> &nbsp;|&nbsp;
+      <a href="/ready"  aria-label="Readiness check endpoint">/ready</a>  &nbsp;|&nbsp;
+      <a href="/stats"  aria-label="Statistics endpoint">/stats</a>
+    </p>
+  </footer>
+
+</body>
+</html>
