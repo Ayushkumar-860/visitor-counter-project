@@ -1,0 +1,222 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# k8s.yaml — Kubernetes Manifests for Visitor Counter Project
+# Includes: Namespace, ConfigMap, Redis (Deployment+Service+PVC),
+#           Flask (Deployment+Service)
+# Apply with: kubectl apply -f k8s.yaml
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Namespace ──────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: visitor-counter
+  labels:
+    project: visitor-counter
+    managed-by: kubectl
+
+---
+# ── ConfigMap ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: visitor-counter-config
+  namespace: visitor-counter
+data:
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_COUNTER_KEY: "visitor_count"
+  APP_ENV: "production"
+  APP_TITLE: "Visitor Counter — Cloud Computing Project"
+  PORT: "5000"
+
+---
+# ── Redis PersistentVolumeClaim ────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: visitor-counter
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  # storageClassName: standard   # Minikube provides "standard" by default
+
+---
+# ── Redis Deployment ───────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: visitor-counter
+  labels:
+    app: redis
+    tier: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  strategy:
+    type: Recreate   # Required when using ReadWriteOnce PVC
+  template:
+    metadata:
+      labels:
+        app: redis
+        tier: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+              name: redis
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --appendfsync
+            - everysec
+            - --maxmemory
+            - 64mb
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: redis-storage
+          persistentVolumeClaim:
+            claimName: redis-pvc
+
+---
+# ── Redis Service (ClusterIP — not exposed externally) ────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: visitor-counter
+  labels:
+    app: redis
+    tier: cache
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
+
+---
+# ── Flask Deployment ───────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-app
+  namespace: visitor-counter
+  labels:
+    app: flask-app
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flask-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: flask-app
+        tier: frontend
+    spec:
+      containers:
+        - name: flask-app
+          image: visitor-counter:latest
+          # Use locally built image — do NOT pull from registry
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: visitor-counter-config
+          resources:
+            requests:
+              cpu: "100m"       # Required for HPA to calculate utilization
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+
+---
+# ── Flask Service (NodePort — accessible from Minikube) ───────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-service
+  namespace: visitor-counter
+  labels:
+    app: flask-app
+    tier: frontend
+spec:
+  type: NodePort
+  selector:
+    app: flask-app
+  ports:
+    - port: 80
+      targetPort: 5000
+      nodePort: 30080
+      protocol: TCP
+      name: http
