@@ -1,0 +1,89 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# docker-compose.yml — Visitor Counter Project
+# Services: flask-app, redis
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+
+  # ── Flask Application ────────────────────────────────────────────────────────
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: visitor-counter:latest
+    container_name: visitor-counter-app
+    ports:
+      - "5000:5000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      REDIS_COUNTER_KEY: visitor_count
+      APP_ENV: production
+      APP_TITLE: "Visitor Counter — Cloud Computing Project"
+      PORT: "5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - visitor-net
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: visitor-counter-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 64mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"   # Remove this in production to avoid exposing Redis
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - visitor-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+# ── Named Volumes ─────────────────────────────────────────────────────────────
+volumes:
+  redis-data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  visitor-net:
+    driver: bridge
