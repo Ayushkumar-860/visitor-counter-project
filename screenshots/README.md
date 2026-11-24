@@ -60,21 +60,6 @@ This checklist maps each assignment requirement to a screenshot you must capture
 
 ---
 
-## How to Take Screenshots on Windows
 
-```powershell
-# Method 1: Snipping Tool (Win + Shift + S) — select area
-# Method 2: Print Screen key, paste in Paint, save as PNG
-# Method 3: PowerShell (full screen):
-Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.Screen]::PrimaryScreen | Out-Null
-$bmp = New-Object System.Drawing.Bitmap([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width,
-                                         [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height)
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen(0, 0, 0, 0, $bmp.Size)
-$bmp.Save("screenshots\screenshot.png")
-```
 
----
 
-> **Note:** Screenshots must show real, running software. Never submit screenshots of placeholder images, edited text, or stock photos. The grader may cross-reference timestamps, pod names, and counter values.
